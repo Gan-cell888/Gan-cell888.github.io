@@ -1,0 +1,50 @@
+---
+---
+
+<div class="mona-container">
+  <img
+    src="https://github.githubassets.com/images/mona-loading-default.gif"
+    alt="Mona the cat"
+    class="mona-cat"
+  />
+  <p class="mona-text">One moment please...</p>
+</div>
+
+<style>
+  .mona-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 40px 0 60px;
+    gap: 12px;
+  }
+
+  .mona-cat {
+    width: 80px;
+    height: auto;
+    transition: transform 0.3s ease;
+    cursor: pointer;
+  }
+
+  .mona-cat:hover {
+    transform: scale(1.1) rotate(5deg);
+  }
+
+  .mona-text {
+    font-size: 0.85rem;
+    color: var(--text-light);
+    font-weight: 500;
+    letter-spacing: 0.02em;
+    animation: fadeInOut 2s ease-in-out infinite;
+  }
+
+  @keyframes fadeInOut {
+    0%, 100% {
+      opacity: 0.5;
+    }
+    50% {
+      opacity: 1;
+    }
+  }
+</style>

@@ -1,0 +1,53 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import { getCollection } from 'astro:content';
+
+const posts = await getCollection('posts');
+const sortedPosts = posts.sort((a, b) => new Date(b.data.date).getTime() - new Date(a.data.date).getTime());
+
+// 按月分组
+function groupByMonth(posts: any[]) {
+  const groups: { [key: string]: any[] } = {};
+  posts.forEach(post => {
+    const date = new Date(post.data.date);
+    const monthKey = `${date.getFullYear()}年${date.getMonth() + 1}月`;
+    if (!groups[monthKey]) {
+      groups[monthKey] = [];
+    }
+    groups[monthKey].push(post);
+  });
+  return groups;
+}
+
+const groupedPosts = groupByMonth(sortedPosts);
+
+// 格式化日期
+function formatDay(dateStr: string) {
+  const date = new Date(dateStr);
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${month}.${day}`;
+}
+---
+
+<BaseLayout title="归档 - 我的博客" description="恒温的树洞 - 文章归档，按时间线浏览所有文章" activePage="archive">
+  <main class="archive">
+    <h1 class="archive-title">文章归档</h1>
+    <p class="archive-desc">共 {posts.length} 篇文章，继续加油！</p>
+
+    {Object.entries(groupedPosts).map(([month, monthPosts]) => (
+      <div class="archive-group">
+        <h2 class="archive-month">{month}</h2>
+        <div class="archive-list">
+          {monthPosts.map((post) => (
+            <a href={`/posts/${post.slug}`} class="archive-item">
+              <time>{formatDay(post.data.date)}</time>
+              <span class="archive-item-title">{post.data.title}</span>
+              <span class="archive-item-tag">{post.data.category}</span>
+            </a>
+          ))}
+        </div>
+      </div>
+    ))}
+  </main>
+</BaseLayout>

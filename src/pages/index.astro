@@ -1,0 +1,21 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import MonaCat from '../components/MonaCat.astro';
+---
+
+<BaseLayout title="我的博客" activePage="home">
+  <!-- 个人介绍 -->
+  <section class="hero">
+    <div class="avatar" role="img" aria-label="恒温的头像"></div>
+    <h1 class="hero-title">您好，我是恒温</h1>
+    <p class="hero-desc">写代码 / 拍照片 / 看书 /记录生活</p>
+    <div class="hero-links">
+      <a href="https://github.com/Gan-cell888" target="_blank">GitHub</a>
+      <a href="https://twitter.com" target="_blank">Twitter</a>
+      <a href="mailto:hello@example.com">邮箱</a>
+    </div>
+  </section>
+
+  <!-- GitHub Mona 章鱼猫 -->
+  <MonaCat />
+</BaseLayout>

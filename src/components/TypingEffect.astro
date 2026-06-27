@@ -1,0 +1,37 @@
+---
+---
+
+<script>
+  // 打字机效果
+  document.addEventListener('DOMContentLoaded', function () {
+    const heroTitle = document.querySelector('.hero-title');
+    if (heroTitle) {
+      const originalText = heroTitle.textContent;
+      heroTitle.textContent = '';
+      heroTitle.style.minHeight = '1.5em';
+
+      const cursor = document.createElement('span');
+      cursor.className = 'typing-cursor';
+      heroTitle.appendChild(cursor);
+
+      let charIndex = 0;
+      function typeNextChar() {
+        if (charIndex < originalText.length) {
+          const textNode = document.createTextNode(originalText[charIndex]);
+          heroTitle.insertBefore(textNode, cursor);
+          charIndex++;
+          setTimeout(typeNextChar, 80 + Math.random() * 40);
+        } else {
+          setTimeout(function () {
+            cursor.style.animation = 'blink 0.5s 3';
+            setTimeout(function () {
+              cursor.style.opacity = '0';
+            }, 1500);
+          }, 1000);
+        }
+      }
+
+      setTimeout(typeNextChar, 500);
+    }
+  });
+</script>

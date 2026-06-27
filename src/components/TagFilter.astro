@@ -1,0 +1,45 @@
+---
+---
+
+<script>
+  // 标签筛选功能
+  document.addEventListener('DOMContentLoaded', function () {
+    const tagFilter = document.getElementById('tag-filter');
+    const postItems = document.querySelectorAll('.post-item[data-tags]');
+
+    if (tagFilter && postItems.length > 0) {
+      const allTags = new Set();
+      postItems.forEach(item => {
+        const tags = item.getAttribute('data-tags').split(',');
+        tags.forEach(tag => allTags.add(tag.trim()));
+      });
+
+      allTags.forEach(tag => {
+        const btn = document.createElement('button');
+        btn.className = 'tag-btn';
+        btn.setAttribute('data-tag', tag);
+        btn.textContent = tag;
+        tagFilter.appendChild(btn);
+      });
+
+      tagFilter.addEventListener('click', function (e) {
+        const btn = e.target.closest('.tag-btn');
+        if (!btn) return;
+
+        const selectedTag = btn.getAttribute('data-tag');
+
+        tagFilter.querySelectorAll('.tag-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+
+        postItems.forEach(item => {
+          const tags = item.getAttribute('data-tags').split(',').map(t => t.trim());
+          if (selectedTag === 'all' || tags.includes(selectedTag)) {
+            item.classList.remove('hidden');
+          } else {
+            item.classList.add('hidden');
+          }
+        });
+      });
+    }
+  });
+</script>

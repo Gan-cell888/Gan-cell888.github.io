@@ -1,0 +1,46 @@
+---
+import BaseLayout from './BaseLayout.astro';
+
+interface Props {
+  title: string;
+  date: Date;
+  category: string;
+  readTime: string;
+  cover?: string;
+  description?: string;
+}
+
+const { title, date, category, readTime, cover, description } = Astro.props;
+
+// 格式化日期
+function formatDate(date: Date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}年${month}月${day}日`;
+}
+---
+
+<BaseLayout title={`${title} - 我的博客`} description={description}>
+  <div class="post-header">
+    <a href="/" class="back-link">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M19 12H5M12 19l-7-7 7-7"/>
+      </svg>
+      返回
+    </a>
+    <h1>{title}</h1>
+    <div class="post-info">
+      <time>{formatDate(date)}</time>
+      <span>·</span>
+      <span>{readTime}</span>
+      <span>·</span>
+      <span>{category}</span>
+    </div>
+  </div>
+
+  <article class="post-content">
+    {cover && <img src={cover} alt={title} class="post-cover">}
+    <slot />
+  </article>
+</BaseLayout>

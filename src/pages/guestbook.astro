@@ -1,0 +1,73 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+---
+
+<BaseLayout title="留言板 - 我的博客" description="恒温的树洞 - 留言板，欢迎留下你的想法" activePage="guestbook">
+  <main class="guestbook">
+    <h1 class="guestbook-title">留言板</h1>
+    <p class="guestbook-desc">欢迎在这里留下你的想法、建议或打个招呼 👋</p>
+
+    <div class="guestbook-notice">
+      <p>💬 评论基于 GitHub Discussions，需要使用 GitHub 账号登录</p>
+      <p>🤝 请保持友善，尊重他人</p>
+    </div>
+
+    <!-- Giscus 评论区 -->
+    <div class="giscus-container">
+      <script src="https://giscus.app/client.js"
+        data-repo="Gan-cell888/Gan-cell888.github.io"
+        data-repo-id="R_kgDOTCiMnQ"
+        data-category="General"
+        data-category-id="DIC_kwDOTCiMnc4C_7Zi"
+        data-mapping="pathname"
+        data-strict="0"
+        data-reactions-enabled="1"
+        data-emit-metadata="0"
+        data-input-position="bottom"
+        data-theme="preferred_color_scheme"
+        data-lang="zh-CN"
+        crossorigin="anonymous"
+        async>
+      </script>
+    </div>
+  </main>
+</BaseLayout>
+
+<script>
+  // 同步 Giscus 主题
+  function updateGiscusTheme() {
+    const theme = document.documentElement.getAttribute('data-theme') || 'light';
+    const giscusTheme = theme === 'dark' ? 'dark' : 'light';
+
+    const iframe = document.querySelector('iframe.giscus-frame');
+    if (iframe) {
+      iframe.contentWindow.postMessage({
+        giscus: {
+          setConfig: {
+            theme: giscusTheme
+          }
+        }
+      }, 'https://giscus.app');
+    }
+  }
+
+  // 监听主题变化
+  const observer = new MutationObserver(function(mutations) {
+    mutations.forEach(function(mutation) {
+      if (mutation.attributeName === 'data-theme') {
+        updateGiscusTheme();
+      }
+    });
+  });
+
+  observer.observe(document.documentElement, {
+    attributes: true,
+    attributeFilter: ['data-theme']
+  });
+
+  // 页面加载时同步主题
+  window.addEventListener('message', function(event) {
+    if (event.origin !== 'https://giscus.app') return;
+    updateGiscusTheme();
+  });
+</script>
