@@ -116,6 +116,15 @@ a {
   box-shadow: var(--shadow-sm);
 }
 
+[data-theme="dark"] .header {
+  background: rgba(15, 15, 26, 0.8);
+  border-bottom: 1px solid rgba(42, 42, 62, 0.6);
+}
+
+[data-theme="dark"] .header.scrolled {
+  background: rgba(15, 15, 26, 0.95);
+}
+
 .header-inner {
   max-width: 720px;
   margin: 0 auto;
