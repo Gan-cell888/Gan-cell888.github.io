@@ -2,8 +2,8 @@
 ---
 
 <script>
-  // 暗色模式切换
-  document.addEventListener('DOMContentLoaded', function () {
+  // 暗色模式切换 - 使用 window 而不是 DOMContentLoaded
+  (function() {
     const themeToggle = document.getElementById('theme-toggle');
     const html = document.documentElement;
 
@@ -40,5 +40,5 @@
         applyTheme(e.matches ? 'dark' : 'light');
       }
     });
-  });
+  })();
 </script>
