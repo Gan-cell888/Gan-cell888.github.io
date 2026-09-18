@@ -1,19 +1,71 @@
 ---
 import BaseLayout from '../layouts/BaseLayout.astro';
 import MonaCat from '../components/MonaCat.astro';
+import HeroBackground from '../components/HeroBackground.astro';
+import { getCollection } from 'astro:content';
+
+const allPosts = await getCollection('posts');
+const latestPosts = allPosts
+  .sort((a, b) => b.data.date.valueOf() - a.data.date.valueOf())
+  .slice(0, 5);
+
+function formatDate(date: Date) {
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${month}-${day}`;
+}
 ---
 
-<BaseLayout title="我的博客" activePage="home">
+<BaseLayout title="恒温的树洞" activePage="home">
   <!-- 个人介绍 -->
   <section class="hero">
-    <div class="avatar" role="img" aria-label="恒温的头像"></div>
-    <h1 class="hero-title">您好，我是恒温</h1>
-    <p class="hero-desc">写代码 / 拍照片 / 看书 /记录生活</p>
-    <div class="hero-links">
-      <a href="https://github.com/Gan-cell888" target="_blank">GitHub</a>
-      <a href="https://twitter.com" target="_blank">Twitter</a>
-      <a href="mailto:hello@example.com">邮箱</a>
+    <HeroBackground />
+    <div class="hero-content">
+      <div class="avatar" role="img" aria-label="恒温的头像"></div>
+      <h1 class="hero-title">
+        <span class="zh">您好，我是恒温</span>
+        <span class="en">Hello, I'm Hengwen</span>
+      </h1>
+      <p class="hero-desc">
+        <span class="zh">写代码 / 拍照片 / 看书 / 记录生活</span>
+        <span class="en">Coding / Photography / Reading / Life</span>
+      </p>
+      <div class="hero-links">
+        <a href="https://github.com/Gan-cell888" target="_blank" rel="noopener">GitHub</a>
+        <a href="https://twitter.com" target="_blank" rel="noopener">Twitter</a>
+        <a href="mailto:hello@example.com">
+          <span class="zh">邮箱</span><span class="en">Email</span>
+        </a>
+      </div>
     </div>
+  </section>
+
+  <!-- 最新文章 -->
+  <section class="posts">
+    <div class="section-title">
+      <span class="zh">最新文章</span>
+      <span class="en">Latest Posts</span>
+    </div>
+    {latestPosts.map((post) => (
+      <a href={`/posts/${post.slug}/`} class="post-item">
+        <div class="post-meta">
+          <time datetime={post.data.date.toISOString()} data-date-iso={post.data.date.toISOString()}>
+            {formatDate(post.data.date)}
+          </time>
+          <span class="post-category">{post.data.category}</span>
+        </div>
+        <div class="post-title">{post.data.title}</div>
+        <div class="post-excerpt">{post.data.description}</div>
+      </a>
+    ))}
+    {allPosts.length > 5 && (
+      <div style="text-align: center; margin-top: 12px;">
+        <a href="/archive" class="hero-links" style="display: inline-block; font-size: 0.85rem; font-weight: 500; color: var(--text-secondary); padding: 8px 20px; border-radius: var(--radius-lg); border: 1px solid var(--border); background: var(--bg-card); transition: all var(--transition-fast); box-shadow: var(--shadow-sm);">
+          <span class="zh">查看全部文章 →</span>
+          <span class="en">View all posts →</span>
+        </a>
+      </div>
+    )}
   </section>
 
   <!-- GitHub Mona 章鱼猫 -->

@@ -20,6 +20,10 @@
         html.removeAttribute('data-theme');
       }
       localStorage.setItem('theme', theme);
+      // 同步 aria-pressed 状态
+      if (themeToggle) {
+        themeToggle.setAttribute('aria-pressed', String(theme === 'dark'));
+      }
     }
 
     // 初始化主题

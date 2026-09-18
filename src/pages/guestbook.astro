@@ -2,14 +2,26 @@
 import BaseLayout from '../layouts/BaseLayout.astro';
 ---
 
-<BaseLayout title="留言板 - 我的博客" description="恒温的树洞 - 留言板，欢迎留下你的想法" activePage="guestbook">
+<BaseLayout title="留言板" description="留言板，欢迎留下你的想法" activePage="guestbook">
   <main class="guestbook">
-    <h1 class="guestbook-title">留言板</h1>
-    <p class="guestbook-desc">欢迎在这里留下你的想法、建议或打个招呼 👋</p>
+    <h1 class="guestbook-title">
+      <span class="zh">留言板</span>
+      <span class="en">Guestbook</span>
+    </h1>
+    <p class="guestbook-desc">
+      <span class="zh">欢迎在这里留下你的想法、建议或打个招呼 👋</span>
+      <span class="en">Leave your thoughts, suggestions, or just say hello 👋</span>
+    </p>
 
     <div class="guestbook-notice">
-      <p>💬 评论基于 GitHub Discussions，需要使用 GitHub 账号登录</p>
-      <p>🤝 请保持友善，尊重他人</p>
+      <p>
+        <span class="zh">💬 评论基于 GitHub Discussions，需要使用 GitHub 账号登录</span>
+        <span class="en">💬 Comments use GitHub Discussions — sign in with your GitHub account</span>
+      </p>
+      <p>
+        <span class="zh">🤝 请保持友善，尊重他人</span>
+        <span class="en">🤝 Please be kind and respectful</span>
+      </p>
     </div>
 
     <!-- Giscus 评论区 -->

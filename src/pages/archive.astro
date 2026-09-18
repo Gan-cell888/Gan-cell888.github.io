@@ -5,12 +5,12 @@ import { getCollection } from 'astro:content';
 const posts = await getCollection('posts');
 const sortedPosts = posts.sort((a, b) => new Date(b.data.date).getTime() - new Date(a.data.date).getTime());
 
-// 按月分组
+// 按月分组（用 ISO 月份键，JS 端根据语言格式化）
 function groupByMonth(posts: any[]) {
   const groups: { [key: string]: any[] } = {};
   posts.forEach(post => {
     const date = new Date(post.data.date);
-    const monthKey = `${date.getFullYear()}年${date.getMonth() + 1}月`;
+    const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
     if (!groups[monthKey]) {
       groups[monthKey] = [];
     }
@@ -21,6 +21,12 @@ function groupByMonth(posts: any[]) {
 
 const groupedPosts = groupByMonth(sortedPosts);
 
+// 中文月份格式
+function formatMonthCN(monthKey: string) {
+  const [y, m] = monthKey.split('-');
+  return `${y}年${parseInt(m)}月`;
+}
+
 // 格式化日期
 function formatDay(dateStr: string) {
   const date = new Date(dateStr);
@@ -30,14 +36,20 @@ function formatDay(dateStr: string) {
 }
 ---
 
-<BaseLayout title="归档 - 我的博客" description="恒温的树洞 - 文章归档，按时间线浏览所有文章" activePage="archive">
+<BaseLayout title="归档" description="文章归档，按时间线浏览所有文章" activePage="archive">
   <main class="archive">
-    <h1 class="archive-title">文章归档</h1>
-    <p class="archive-desc">共 {posts.length} 篇文章，继续加油！</p>
+    <h1 class="archive-title">
+      <span class="zh">文章归档</span>
+      <span class="en">Archive</span>
+    </h1>
+    <p class="archive-desc">
+      <span class="zh">共 {posts.length} 篇文章，继续加油！</span>
+      <span class="en">{posts.length} posts in total. Keep going!</span>
+    </p>
 
-    {Object.entries(groupedPosts).map(([month, monthPosts]) => (
+    {Object.entries(groupedPosts).map(([monthKey, monthPosts]) => (
       <div class="archive-group">
-        <h2 class="archive-month">{month}</h2>
+        <h2 class="archive-month" data-date-month={monthKey}>{formatMonthCN(monthKey)}</h2>
         <div class="archive-list">
           {monthPosts.map((post) => (
             <a href={`/posts/${post.slug}`} class="archive-item">

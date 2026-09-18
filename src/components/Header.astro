@@ -9,12 +9,20 @@ const { activePage = 'home' } = Astro.props;
 <header class="header">
   <div class="header-inner">
     <a href="/" class="site-name">恒温的树洞</a>
-    <nav class="nav">
-      <a href="/" class={activePage === 'home' ? 'active' : ''}>文章</a>
-      <a href="/archive" class={activePage === 'archive' ? 'active' : ''}>归档</a>
-      <a href="/guestbook" class={activePage === 'guestbook' ? 'active' : ''}>留言</a>
-      <a href="/about" class={activePage === 'about' ? 'active' : ''}>关于</a>
-      <button class="theme-toggle" id="theme-toggle" aria-label="切换暗色模式">
+    <nav class="nav" aria-label="主导航">
+      <a href="/" class={activePage === 'home' ? 'active' : ''} aria-current={activePage === 'home' ? 'page' : undefined}>
+        <span class="zh">文章</span><span class="en">Posts</span>
+      </a>
+      <a href="/archive" class={activePage === 'archive' ? 'active' : ''} aria-current={activePage === 'archive' ? 'page' : undefined}>
+        <span class="zh">归档</span><span class="en">Archive</span>
+      </a>
+      <a href="/guestbook" class={activePage === 'guestbook' ? 'active' : ''} aria-current={activePage === 'guestbook' ? 'page' : undefined}>
+        <span class="zh">留言</span><span class="en">Guestbook</span>
+      </a>
+      <a href="/about" class={activePage === 'about' ? 'active' : ''} aria-current={activePage === 'about' ? 'page' : undefined}>
+        <span class="zh">关于</span><span class="en">About</span>
+      </a>
+      <button class="theme-toggle" id="theme-toggle" aria-label="切换暗色模式" aria-pressed="false">
         <svg class="icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
         </svg>
@@ -29,6 +37,14 @@ const { activePage = 'home' } = Astro.props;
           <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/>
           <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
         </svg>
+      </button>
+      <button class="lang-toggle" id="lang-toggle" aria-label="Switch to English">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="10"/>
+          <line x1="2" y1="12" x2="22" y2="12"/>
+          <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
+        </svg>
+        <span class="lang-toggle-text">EN</span>
       </button>
     </nav>
   </div>

@@ -1,0 +1,482 @@
+---
+// 暗色模式 Hero 背景 — 性能优化版
+---
+
+<div class="hero-ambient" aria-hidden="true">
+  <canvas class="hero-fluid" id="hero-fluid"></canvas>
+  <div class="hero-whale-glow"></div>
+  <canvas class="hero-grid" id="hero-grid"></canvas>
+  <canvas class="hero-whale" id="hero-whale"></canvas>
+</div>
+<div class="hero-overlay" aria-hidden="true"></div>
+
+<style>
+  .hero-ambient {
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    overflow: hidden;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.6s ease;
+  }
+  .hero-overlay { display: none; }
+  .hero-fluid, .hero-grid, .hero-whale {
+    position: absolute;
+    inset: 0;
+    display: block;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+  }
+  .hero-fluid { z-index: 0; opacity: 0.98; }
+  .hero-whale-glow {
+    position: absolute;
+    z-index: 1;
+    top: -30%;
+    left: -15%;
+    width: 80%;
+    height: 80%;
+    opacity: 0;
+    pointer-events: none;
+    mix-blend-mode: screen;
+    background: radial-gradient(ellipse at center,
+      rgba(108,140,255,0.15) 0%,
+      rgba(80,110,200,0.08) 30%,
+      rgba(50,70,140,0.04) 50%,
+      transparent 70%);
+    filter: blur(20px);
+    transform-origin: 46% 60%;
+    will-change: transform, opacity;
+  }
+  .hero-grid {
+    z-index: 2;
+    opacity: 0.9;
+    -webkit-mask-image: linear-gradient(rgba(0,0,0,0.99) 0%, rgba(0,0,0,0.91) 9%, transparent 100%);
+    mask-image: linear-gradient(rgba(0,0,0,0.99) 0%, rgba(0,0,0,0.91) 9%, transparent 100%);
+  }
+  .hero-whale {
+    z-index: 3;
+    opacity: 1;
+    mix-blend-mode: screen;
+  }
+</style>
+
+<script is:inline>
+  (function () {
+    function init() {
+      var fluidCanvas = document.getElementById('hero-fluid');
+      var gridCanvas = document.getElementById('hero-grid');
+      var whaleCanvas = document.getElementById('hero-whale');
+      if (!fluidCanvas || !gridCanvas || !whaleCanvas || !fluidCanvas.getContext) return;
+
+      var fluidCtx = fluidCanvas.getContext('2d');
+      var gridCtx = gridCanvas.getContext('2d');
+      var whaleCtx = whaleCanvas.getContext('2d');
+      var reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
+      var compact = window.matchMedia('(max-width: 767px)');
+      var gridNodes = [];
+      var gridCols = 0, gridRows = 0;
+      var whalePoints = [];
+      var width = 0, height = 0, dpr = 1;
+      var frame = 0, visible = true, lastFrameTime = 0;
+      var pointer = { x: -1000, y: -1000, active: false };
+      var pointerEase = { x: 0, y: 0 };
+      var pointerStrength = 0, whaleHovered = false;
+
+      // 模糊光带离屏缓存
+      var blurCanvas = null, blurCtx = null, blurDirty = true;
+
+      function hash(seed) {
+        var value = Math.sin(seed * 12.9898) * 43758.5453;
+        return value - Math.floor(value);
+      }
+
+      function sizeCanvas(canvas, ctx, ratio) {
+        canvas.width = Math.round(width * ratio);
+        canvas.height = Math.round(height * ratio);
+        ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
+      }
+
+      // 鲸鱼形状 — 降低采样密度，只保留轮廓关键点
+      function generateWhaleShape() {
+        var pts = [];
+        var size = 40; // 从60降到40
+        for (var gy = 0; gy < size; gy += 2) { // 步长2，点数减半
+          for (var gx = 0; gx < size; gx += 2) {
+            var nx = (gx - 20) / 20;
+            var ny = (gy - 20) / 20;
+            var body = nx * nx * 1.8 + ny * ny * 0.7;
+            var inBody = body < 1.0;
+            var tailX = nx - 0.6;
+            var tailY = Math.abs(ny) - 0.15;
+            var inTail = tailX > 0 && tailX < 0.5 && tailY < 0.25 * (1 - tailX * 1.5) && ny * ny > 0.02;
+            var headBulge = nx < -0.5 && ny * ny < 0.15 && (nx + 0.8) * (nx + 0.8) + ny * ny * 4 < 0.2;
+            var finX = nx + 0.1;
+            var finY = ny - 0.35;
+            var inFin = finX > -0.2 && finX < 0.15 && finY > 0 && finY < 0.3 && finY < 0.3 - finX * 2;
+            if ((inBody || inTail || headBulge || inFin) && body < 1.3) {
+              var edgeDist = Math.abs(body - 0.85);
+              if (edgeDist < 0.25 || inTail || inFin || headBulge) {
+                pts.push({ x: gx, y: gy });
+              }
+            }
+          }
+        }
+        // 简化邻居过滤：用空间网格替代 O(n²)
+        var grid = {};
+        pts.forEach(function(p) {
+          var key = Math.floor(p.x / 3) + ',' + Math.floor(p.y / 3);
+          grid[key] = true;
+        });
+        whalePoints = pts.filter(function(p) {
+          var kx = Math.floor(p.x / 3), ky = Math.floor(p.y / 3);
+          for (var dx = -1; dx <= 1; dx++) {
+            for (var dy = -1; dy <= 1; dy++) {
+              if (dx === 0 && dy === 0) continue;
+              if (grid[(kx + dx) + ',' + (ky + dy)]) return true;
+            }
+          }
+          return false;
+        });
+      }
+
+      function rebuildGrid() {
+        // 网格间距从90增到120，减少节点数
+        var step = compact.matches ? 120 : 100;
+        gridCols = Math.ceil(width / step) + 1;
+        gridRows = Math.ceil(height / step) + 1;
+        var offsetX = (width - (gridCols - 1) * step) / 2;
+        var offsetY = (height - (gridRows - 1) * step) / 2;
+        gridNodes = [];
+        for (var row = 0; row < gridRows; row++) {
+          for (var col = 0; col < gridCols; col++) {
+            var x = offsetX + col * step;
+            var y = offsetY + row * step;
+            gridNodes.push({ restX: x, restY: y, x: x, y: y, vx: 0, vy: 0 });
+          }
+        }
+      }
+
+      // 预渲染模糊光带（只在 resize 时重绘）
+      function renderBlurCache() {
+        if (!blurCanvas) {
+          blurCanvas = document.createElement('canvas');
+          blurCtx = blurCanvas.getContext('2d');
+        }
+        blurCanvas.width = width;
+        blurCanvas.height = height;
+        blurCtx.clearRect(0, 0, width, height);
+
+        var time = 0; // 静态版本，动画通过整体偏移模拟
+        blurCtx.save();
+        blurCtx.filter = 'blur(' + Math.max(20, width * 0.025) + 'px)';
+        blurCtx.lineCap = 'round';
+        blurCtx.lineJoin = 'round';
+
+        blurCtx.strokeStyle = 'rgba(192, 202, 214, 0.18)';
+        blurCtx.lineWidth = Math.max(62, width * 0.07);
+        blurCtx.beginPath();
+        blurCtx.moveTo(width * 0.45, -height * 0.16);
+        blurCtx.bezierCurveTo(width * 0.56, height * 0.06, width * 0.39, height * 0.19, width * 0.51, height * 0.43);
+        blurCtx.stroke();
+
+        blurCtx.strokeStyle = 'rgba(91, 117, 151, 0.2)';
+        blurCtx.lineWidth = Math.max(86, width * 0.095);
+        blurCtx.beginPath();
+        blurCtx.moveTo(width * 0.67, -height * 0.13);
+        blurCtx.bezierCurveTo(width * 0.87, height * 0.05, width * 1.02, height * 0.24, width * 1.04, height * 0.58);
+        blurCtx.stroke();
+
+        blurCtx.strokeStyle = 'rgba(32, 52, 84, 0.2)';
+        blurCtx.lineWidth = Math.max(74, width * 0.08);
+        blurCtx.beginPath();
+        blurCtx.moveTo(-width * 0.08, height * 0.65);
+        blurCtx.bezierCurveTo(width * 0.12, height * 0.42, width * 0.22, height * 0.42, width * 0.4, height * 0.7);
+        blurCtx.stroke();
+        blurCtx.restore();
+        blurDirty = false;
+      }
+
+      function resize() {
+        var hero = document.querySelector('.hero');
+        if (!hero) return;
+        var rect = hero.getBoundingClientRect();
+        width = Math.max(1, Math.round(rect.width));
+        height = Math.max(1, Math.round(rect.height));
+        dpr = Math.min(window.devicePixelRatio || 1, 2);
+        sizeCanvas(fluidCanvas, fluidCtx, 1);
+        sizeCanvas(gridCanvas, gridCtx, dpr);
+        sizeCanvas(whaleCanvas, whaleCtx, Math.min(dpr, 1.5));
+        pointerEase.x = width * 0.5;
+        pointerEase.y = height * 0.34;
+        rebuildGrid();
+        blurDirty = true;
+        drawFrame(performance.now());
+      }
+
+      // 流体层 — 使用缓存的模糊光带
+      function drawFluid(time) {
+        fluidCtx.clearRect(0, 0, width, height);
+        var base = fluidCtx.createLinearGradient(0, height, width, 0);
+        base.addColorStop(0, '#040508');
+        base.addColorStop(0.28, '#090d14');
+        base.addColorStop(0.52, '#101827');
+        base.addColorStop(0.7, '#17243a');
+        base.addColorStop(0.84, '#0d121d');
+        base.addColorStop(1, '#050609');
+        fluidCtx.fillStyle = base;
+        fluidCtx.fillRect(0, 0, width, height);
+
+        pointerEase.x += ((pointer.active ? pointer.x : width * 0.62) - pointerEase.x) * 0.025;
+        pointerEase.y += ((pointer.active ? pointer.y : height * 0.22) - pointerEase.y) * 0.025;
+        fluidCtx.globalCompositeOperation = 'screen';
+
+        var inkX = width * (0.18 + Math.sin(time * 0.13) * 0.05);
+        var inkY = height * (0.16 + Math.cos(time * 0.11) * 0.06);
+        var ink = fluidCtx.createRadialGradient(inkX, inkY, 0, inkX, inkY, Math.max(width, height) * 0.62);
+        ink.addColorStop(0, 'rgba(24, 45, 78, 0.48)');
+        ink.addColorStop(0.46, 'rgba(18, 33, 58, 0.24)');
+        ink.addColorStop(1, 'rgba(5, 9, 16, 0)');
+        fluidCtx.fillStyle = ink;
+        fluidCtx.fillRect(0, 0, width, height);
+
+        var warmX = width * (0.77 + Math.sin(time * 0.09) * 0.035);
+        var warmY = height * (0.03 + Math.cos(time * 0.12) * 0.045);
+        var warm = fluidCtx.createRadialGradient(warmX, warmY, 0, warmX, warmY, Math.max(width, height) * 0.44);
+        warm.addColorStop(0, 'rgba(142, 160, 185, 0.26)');
+        warm.addColorStop(0.25, 'rgba(68, 85, 111, 0.16)');
+        warm.addColorStop(0.72, 'rgba(20, 31, 49, 0.08)');
+        warm.addColorStop(1, 'rgba(0, 0, 0, 0)');
+        fluidCtx.fillStyle = warm;
+        fluidCtx.fillRect(0, 0, width, height);
+
+        // 绘制缓存的模糊光带（不再每帧 blur）
+        if (blurDirty) renderBlurCache();
+        fluidCtx.drawImage(blurCanvas, 0, 0);
+
+        var cursorGlow = fluidCtx.createRadialGradient(pointerEase.x, pointerEase.y, 0, pointerEase.x, pointerEase.y, 210);
+        cursorGlow.addColorStop(0, 'rgba(100, 130, 170, ' + (pointer.active ? '0.15' : '0.06') + ')');
+        cursorGlow.addColorStop(1, 'rgba(27, 44, 70, 0)');
+        fluidCtx.fillStyle = cursorGlow;
+        fluidCtx.fillRect(0, 0, width, height);
+
+        // 去掉每帧噪点绘制（性能杀手）
+      }
+
+      // 网格层 — 批量绘制优化
+      function drawGrid() {
+        gridCtx.clearRect(0, 0, width, height);
+        var i, node, dx, dy, dist, force;
+        for (i = 0; i < gridNodes.length; i++) {
+          node = gridNodes[i];
+          if (pointer.active) {
+            dx = node.x - pointer.x;
+            dy = node.y - pointer.y;
+            dist = Math.sqrt(dx * dx + dy * dy);
+            if (dist < 140 && dist > 0.1) {
+              force = (1 - dist / 140) * 30;
+              node.vx += (dx / dist) * force * 0.1;
+              node.vy += (dy / dist) * force * 0.1;
+            }
+          }
+          node.vx += (node.restX - node.x) * 0.05;
+          node.vy += (node.restY - node.y) * 0.05;
+          node.vx *= 0.85;
+          node.vy *= 0.85;
+          node.x += node.vx;
+          node.y += node.vy;
+        }
+
+        // 合并所有水平线为单次 Path
+        gridCtx.strokeStyle = 'rgba(255, 255, 255, 0.08)';
+        gridCtx.lineWidth = 0.5;
+        gridCtx.beginPath();
+        for (var row = 0; row < gridRows; row++) {
+          for (var col = 0; col < gridCols - 1; col++) {
+            var l = gridNodes[row * gridCols + col];
+            var r = gridNodes[row * gridCols + col + 1];
+            gridCtx.moveTo(l.x + 10, l.y);
+            gridCtx.lineTo(r.x - 10, r.y);
+          }
+        }
+        // 合并所有垂直线为单次 Path
+        for (var c = 0; c < gridCols; c++) {
+          for (var rw = 0; rw < gridRows - 1; rw++) {
+            var t = gridNodes[rw * gridCols + c];
+            var b = gridNodes[(rw + 1) * gridCols + c];
+            gridCtx.moveTo(t.x, t.y + 10);
+            gridCtx.lineTo(b.x, b.y - 10);
+          }
+        }
+        gridCtx.stroke(); // 一次 stroke 绘制所有线
+
+        // 合并所有节点为单次 fillRect
+        gridCtx.fillStyle = 'rgba(255, 255, 255, 0.16)';
+        for (i = 0; i < gridNodes.length; i++) {
+          node = gridNodes[i];
+          var dotSize = 3.6;
+          if (pointer.active) {
+            dx = node.x - pointer.x;
+            dy = node.y - pointer.y;
+            dist = Math.sqrt(dx * dx + dy * dy);
+            if (dist < 140) dotSize += (1 - dist / 140) * 4;
+          }
+          gridCtx.fillRect(node.x - dotSize / 2, node.y - dotSize / 2, dotSize, dotSize);
+        }
+      }
+
+      // 鲸鱼粒子层
+      var cachedHeroRect = null;
+      var heroRectTime = 0;
+
+      function drawWhale(time) {
+        whaleCtx.clearRect(0, 0, width, height);
+        if (!whalePoints.length) return;
+
+        var baseAlpha = compact.matches ? 0.11 : 0.14;
+        // 缓存 hero rect，每500ms更新一次
+        if (!cachedHeroRect || time - heroRectTime > 0.5) {
+          var heroEl = document.querySelector('.hero');
+          if (heroEl) cachedHeroRect = heroEl.getBoundingClientRect();
+          heroRectTime = time;
+        }
+        var scroll = cachedHeroRect ? Math.min(1, Math.max(0, -cachedHeroRect.top / (height * 0.6))) : 0;
+        var silhouetteSize = compact.matches
+          ? Math.min(360, width * 0.96, height * 0.52)
+          : Math.min(760, width * 0.64, height * 1.08);
+        var pointStep = silhouetteSize / 40;
+        var centerX = width * (compact.matches ? 0.5 : 0.34);
+        var centerY = height * (compact.matches ? 0.24 : 0.46) + Math.sin(time * 0.4) * (compact.matches ? 3 : 7) + scroll * 26;
+        var groupScale = 0.956 * (1 - 0.5 * scroll);
+        var rotation = 0.04 * Math.sin(time * 0.25);
+
+        var pointerTarget = whaleHovered && pointer.active ? 1 : 0;
+        var pointerEaseRate = pointerTarget > pointerStrength ? 0.3 : 0.14;
+        pointerStrength += (pointerTarget - pointerStrength) * pointerEaseRate;
+        var mouseX = pointer.x - centerX;
+        var mouseY = pointer.y - centerY;
+        var mouseRadius = silhouetteSize * 0.15;
+
+        whaleCtx.save();
+        whaleCtx.translate(centerX, centerY);
+        whaleCtx.rotate(rotation);
+        whaleCtx.scale(groupScale, groupScale * (1 + Math.sin(time * 0.08) * 0.025));
+        whaleCtx.globalCompositeOperation = 'source-over';
+
+        if (pointerStrength > 0.01 && !reduceMotion.matches) {
+          var glow = whaleCtx.createRadialGradient(mouseX, mouseY, 0, mouseX, mouseY, mouseRadius);
+          glow.addColorStop(0, 'rgba(230,237,246,' + (0.13 * pointerStrength).toFixed(3) + ')');
+          glow.addColorStop(0.34, 'rgba(188,204,224,' + (0.065 * pointerStrength).toFixed(3) + ')');
+          glow.addColorStop(1, 'rgba(97,124,160,0)');
+          whaleCtx.fillStyle = glow;
+          whaleCtx.beginPath();
+          whaleCtx.arc(mouseX, mouseY, mouseRadius, 0, Math.PI * 2);
+          whaleCtx.fill();
+        }
+
+        whalePoints.forEach(function (point) {
+          var targetX = (point.x - 20) * pointStep; // 与采样size匹配
+          var targetY = (point.y - 20) * pointStep;
+          var x = targetX, y = targetY;
+          var activity = reduceMotion.matches ? 0 : pointerStrength;
+          var mouseInfluence = 0;
+
+          if (pointerStrength > 0.01 && !reduceMotion.matches) {
+            var mdx = x - mouseX, mdy = y - mouseY;
+            var mdist = Math.sqrt(mdx * mdx + mdy * mdy);
+            if (mdist < mouseRadius && mdist > 0.1) {
+              var falloff = 1 - mdist / mouseRadius;
+              mouseInfluence = falloff * falloff * (3 - 2 * falloff);
+              var wave = Math.sin(mdist / pointStep * 1.35 - time * 10.5);
+              var dir = Math.atan2(mdy, mdx);
+              var seed = point.y * 40 + point.x + 1;
+              var rA = hash(seed + 23) * Math.PI * 2;
+              var rB = hash(seed + 211) * Math.PI * 2;
+              var pA = Math.sin(time * (4.8 + hash(seed + 67) * 3.2) + hash(seed + 101) * Math.PI * 2);
+              var pB = Math.cos(time * (5.6 + hash(seed + 307) * 2.6) + hash(seed + 401) * Math.PI * 2);
+              var rf = mouseInfluence * activity * pointStep * 3.05;
+              var wf = mouseInfluence * activity * pointStep * wave * 0.65;
+              x += Math.cos(rA) * pA * rf + Math.cos(rB) * pB * rf * 0.42 + Math.cos(dir) * wf;
+              y += Math.sin(rA) * pA * rf + Math.sin(rB) * pB * rf * 0.42 + Math.sin(dir) * wf;
+            }
+          }
+
+          var alpha = Math.min(0.5, baseAlpha + mouseInfluence * activity * 0.3);
+          whaleCtx.fillStyle = 'rgba(205,216,230,' + alpha.toFixed(3) + ')';
+          var sz = Math.max(1.4, pointStep * 0.35);
+          whaleCtx.fillRect(x - sz / 2, y - sz / 2, sz, sz);
+        });
+        whaleCtx.restore();
+      }
+
+      function drawFrame(now) {
+        var time = reduceMotion.matches ? 0 : now / 1000;
+        drawFluid(time);
+        if (!compact.matches) drawGrid();
+        else gridCtx.clearRect(0, 0, width, height);
+        drawWhale(time);
+      }
+
+      function tick(now) {
+        frame = 0;
+        if (!visible || document.hidden || reduceMotion.matches) return;
+        var interval = 1000 / (compact.matches ? 15 : 20); // 降帧率
+        if (now - lastFrameTime >= interval) {
+          lastFrameTime = now - (now - lastFrameTime) % interval;
+          drawFrame(now);
+        }
+        frame = window.requestAnimationFrame(tick);
+      }
+
+      function syncAnimation() {
+        if (frame) window.cancelAnimationFrame(frame);
+        frame = 0;
+        drawFrame(performance.now());
+        if (!reduceMotion.matches && visible && !document.hidden) {
+          frame = window.requestAnimationFrame(tick);
+        }
+      }
+
+      var hero = document.querySelector('.hero');
+      if (hero) {
+        hero.addEventListener('pointermove', function (e) {
+          var rect = hero.getBoundingClientRect();
+          pointer.x = e.clientX - rect.left;
+          pointer.y = e.clientY - rect.top;
+          pointer.active = true;
+          var ss = compact.matches ? Math.min(360, width * 0.96, height * 0.52) : Math.min(760, width * 0.64, height * 1.08);
+          var cx = width * (compact.matches ? 0.5 : 0.34);
+          var cy = height * (compact.matches ? 0.24 : 0.46);
+          whaleHovered = Math.abs(pointer.x - cx) < ss * 0.54 && Math.abs(pointer.y - cy) < ss * 0.43;
+          if (reduceMotion.matches) drawFrame(performance.now());
+        }, { passive: true });
+
+        hero.addEventListener('pointerleave', function () {
+          pointer.active = false;
+          whaleHovered = false;
+          if (reduceMotion.matches) drawFrame(performance.now());
+        }, { passive: true });
+      }
+
+      document.addEventListener('visibilitychange', syncAnimation);
+      if (reduceMotion.addEventListener) reduceMotion.addEventListener('change', syncAnimation);
+      if (compact.addEventListener) compact.addEventListener('change', syncAnimation);
+      if (window.ResizeObserver) new ResizeObserver(resize).observe(document.body);
+      else window.addEventListener('resize', resize, { passive: true });
+      if (window.IntersectionObserver) {
+        new IntersectionObserver(function (entries) {
+          visible = entries[0] ? entries[0].isIntersecting : true;
+          syncAnimation();
+        }, { threshold: 0.02 }).observe(fluidCanvas);
+      }
+
+      generateWhaleShape();
+      resize();
+      syncAnimation();
+    }
+
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
+    else init();
+  })();
+</script>

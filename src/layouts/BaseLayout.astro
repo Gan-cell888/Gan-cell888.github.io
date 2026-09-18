@@ -1,7 +1,6 @@
 ---
 import Header from '../components/Header.astro';
 import Footer from '../components/Footer.astro';
-import CursorGlow from '../components/CursorGlow.astro';
 import ThemeToggle from '../components/ThemeToggle.astro';
 import '../styles/global.css';
 
@@ -9,18 +8,86 @@ interface Props {
   title: string;
   description?: string;
   activePage?: string;
+  ogImage?: string;
+  ogType?: 'website' | 'article';
+  publishDate?: string;
+  tags?: string[];
 }
 
-const { title, description = '恒温的树洞 - 一个关于代码、摄影、读书和生活的个人博客', activePage = 'home' } = Astro.props;
+const {
+  title,
+  description = '恒温的树洞 - 一个关于代码、摄影、读书和生活的个人博客',
+  activePage = 'home',
+  ogImage = '/favicon.svg',
+  ogType = 'website',
+  publishDate,
+  tags,
+} = Astro.props;
+
+const canonicalURL = new URL(Astro.url.pathname, Astro.site);
+const siteName = '恒温的树洞';
+const fullTitle = activePage === 'home' ? `${siteName} - 用代码搭建，用文字记录` : `${title} - ${siteName}`;
+
+// JSON-LD 结构化数据
+const jsonLd = ogType === 'article'
+  ? {
+      '@context': 'https://schema.org',
+      '@type': 'BlogPosting',
+      headline: title,
+      description: description,
+      url: canonicalURL.href,
+      image: ogImage,
+      datePublished: publishDate,
+      author: { '@type': 'Person', name: '恒温' },
+      publisher: { '@type': 'Person', name: '恒温' },
+      mainEntityOfPage: { '@type': 'WebPage', '@id': canonicalURL.href },
+      inLanguage: 'zh-CN',
+    }
+  : {
+      '@context': 'https://schema.org',
+      '@type': 'WebSite',
+      name: siteName,
+      url: Astro.site,
+      description: description,
+      author: { '@type': 'Person', name: '恒温' },
+      inLanguage: 'zh-CN',
+    };
 ---
 
-<html lang="zh-CN">
+<html lang="zh-CN" data-lang="zh"
+  data-article-title={ogType === 'article' ? title : undefined}
+  data-article-desc={ogType === 'article' ? description : undefined}
+>
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="description" content={description}>
+  <meta name="robots" content="index,follow,max-image-preview:large">
   <link rel="icon" type="image/svg+xml" href="/favicon.svg">
-  <title>{title}</title>
+  <link rel="canonical" href={canonicalURL.href}>
+
+  <!-- Open Graph -->
+  <meta property="og:type" content={ogType}>
+  <meta property="og:site_name" content={siteName}>
+  <meta property="og:locale" content="zh_CN">
+  <meta property="og:title" content={fullTitle}>
+  <meta property="og:description" content={description}>
+  <meta property="og:url" content={canonicalURL.href}>
+  <meta property="og:image" content={new URL(ogImage, Astro.site).href}>
+
+  <!-- Twitter Card -->
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content={fullTitle}>
+  <meta name="twitter:description" content={description}>
+  <meta name="twitter:image" content={new URL(ogImage, Astro.site).href}>
+
+  {publishDate && <meta property="article:published_time" content={publishDate} />}
+  {tags?.map((tag) => <meta property="article:tag" content={tag} />)}
+
+  <!-- JSON-LD 结构化数据 -->
+  <script type="application/ld+json" set:html={JSON.stringify(jsonLd)} />
+
+  <title>{fullTitle}</title>
 </head>
 <body>
   <div class="wrapper">
@@ -28,8 +95,8 @@ const { title, description = '恒温的树洞 - 一个关于代码、摄影、�
     <slot />
     <Footer />
   </div>
-  <CursorGlow />
   <ThemeToggle />
+  <script src="/src/scripts/i18n.js"></script>
   <script src="/src/scripts/main.js"></script>
 </body>
 </html>
