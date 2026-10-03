@@ -52,7 +52,7 @@ function formatDay(dateStr: string) {
         <h2 class="archive-month" data-date-month={monthKey}>{formatMonthCN(monthKey)}</h2>
         <div class="archive-list">
           {monthPosts.map((post) => (
-            <a href={`/posts/${post.slug}`} class="archive-item">
+            <a href={`${import.meta.env.BASE_URL}/posts/${post.slug}`} class="archive-item">
               <time>{formatDay(post.data.date)}</time>
               <span class="archive-item-title">{post.data.title}</span>
               <span class="archive-item-tag">{post.data.category}</span>

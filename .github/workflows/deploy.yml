@@ -33,10 +33,13 @@ jobs:
       - name: Build with Astro
         run: npm run build
 
+      - name: Stage site
+        run: bash scripts/stage-site.sh
+
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: dist
+          path: site
 
   deploy:
     environment:
