@@ -26,3 +26,8 @@ pnpm-debug.log*
 
 # misc
 *.local
+
+# local QA / tooling
+.pw-tmp/
+.playwright-cli/
+assets/preview-*.png
