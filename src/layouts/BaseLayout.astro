@@ -24,7 +24,9 @@ const {
   tags,
 } = Astro.props;
 
-const canonicalURL = new URL(Astro.url.pathname, Astro.site);
+// 目录型地址统一带尾斜杠，否则首页 canonical 会和 sitemap 对不上
+const pathname = Astro.url.pathname.endsWith('/') ? Astro.url.pathname : `${Astro.url.pathname}/`;
+const canonicalURL = new URL(pathname, Astro.site);
 const siteName = '恒温的树洞';
 const fullTitle = activePage === 'home' ? `${siteName} - 用代码搭建，用文字记录` : `${title} - ${siteName}`;
 
