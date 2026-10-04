@@ -1499,6 +1499,10 @@ body.is-pointer .cursor-glow {
   gap: 4px;
 }
 
+.writing__more {
+  margin-top: 28px;
+}
+
 .post {
   display: grid;
   grid-template-columns: 100px 1fr auto;
